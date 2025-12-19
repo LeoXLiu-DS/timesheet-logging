@@ -5,13 +5,14 @@ import { enhanceDescription } from '../services/geminiService';
 import { Loader2, Sparkles, Send } from 'lucide-react';
 
 interface TimeEntryFormProps {
+  tenantId: string;
   contractorId: string;
   contractorName: string;
   onSubmit: (entry: Omit<TimeEntry, 'id'>) => void;
   onCancel: () => void;
 }
 
-const TimeEntryForm: React.FC<TimeEntryFormProps> = ({ contractorId, contractorName, onSubmit, onCancel }) => {
+const TimeEntryForm: React.FC<TimeEntryFormProps> = ({ tenantId, contractorId, contractorName, onSubmit, onCancel }) => {
   const [projectId, setProjectId] = useState(MOCK_PROJECTS[0].id);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [hours, setHours] = useState<number | ''>(8);
@@ -32,6 +33,7 @@ const TimeEntryForm: React.FC<TimeEntryFormProps> = ({ contractorId, contractorN
     if (!project || !hours) return;
 
     onSubmit({
+      tenantId,
       contractorId,
       contractorName,
       projectId,
