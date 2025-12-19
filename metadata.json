@@ -1,0 +1,5 @@
+{
+  "name": "Odoo TimeLink",
+  "description": "A streamlined contractor time logging application with manager approval workflows.",
+  "requestFramePermissions": []
+}
