@@ -1,25 +1,20 @@
 import React, { useState } from 'react';
-import { User, Role } from '../types';
-import { MOCK_TENANTS } from '../constants';
-import { loginWithMicrosoft } from '../services/authService';
-import { ShieldCheck, Loader2, Mail, Building2, ExternalLink } from 'lucide-react';
+import { signInWithAzure } from '../services/authService';
+import { ShieldCheck, Loader2 } from 'lucide-react';
 
-interface LoginProps {
-  onLogin: (user: User) => void;
-}
-
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedTenantId, setSelectedTenantId] = useState(MOCK_TENANTS[0].id);
+  const [error, setError] = useState('');
 
-  const handleLogin = async (role: Role) => {
+  const handleAzureLogin = async () => {
     setIsLoading(true);
+    setError('');
+
     try {
-      const user = await loginWithMicrosoft(selectedTenantId, role);
-      onLogin(user);
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "Authentication failed");
-    } finally {
+      await signInWithAzure();
+      // Redirect happens automatically - no need to handle success here
+    } catch (err) {
+      setError('Failed to initiate sign-in. Please try again.');
       setIsLoading(false);
     }
   };
@@ -42,70 +37,63 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-lg">
         <div className="bg-white py-10 px-10 shadow-[0_20px_50px_rgba(8,_112,_184,_0.07)] rounded-[2rem] border border-slate-200">
-          <div className="space-y-8">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center">
-                <Building2 className="w-3 h-3 mr-1" /> Organization Tenant
-              </label>
-              <select
-                value={selectedTenantId}
-                onChange={(e) => setSelectedTenantId(e.target.value)}
-                className="block w-full px-4 py-4 text-base border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-xl border bg-slate-50/50 transition-all"
-              >
-                {MOCK_TENANTS.map(t => (
-                  <option key={t.id} value={t.id}>{t.name} ({t.domain})</option>
-                ))}
-              </select>
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+              {error}
             </div>
+          )}
 
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                <Loader2 className="h-10 w-10 text-indigo-600 animate-spin" />
-                <p className="text-sm font-semibold text-slate-600">Verifying Identity with Microsoft Entra ID...</p>
-                <p className="text-xs text-slate-400">Authenticating via OIDC Federation</p>
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <Loader2 className="h-10 w-10 text-indigo-600 animate-spin" />
+              <p className="text-sm font-semibold text-slate-600">
+                Redirecting to Microsoft...
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="text-center mb-8">
+                <p className="text-slate-600 text-sm">
+                  Sign in with your company Microsoft account to access the timesheet system.
+                </p>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <button
-                  onClick={() => handleLogin(Role.CONTRACTOR)}
-                  className="w-full flex items-center justify-center px-6 py-4 border border-transparent text-md font-bold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 transition-all active:scale-95"
-                >
-                  <Mail className="mr-3 h-5 w-5" />
-                  Sign in with Microsoft
-                </button>
-                
-                <div className="relative py-4">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-100" />
-                  </div>
-                  <div className="relative flex justify-center text-[10px] font-black uppercase tracking-[0.2em]">
-                    <span className="px-4 bg-white text-slate-300">Administrative Portal</span>
-                  </div>
-                </div>
 
-                <button
-                  onClick={() => handleLogin(Role.MANAGER)}
-                  className="group w-full flex items-center justify-center px-6 py-4 border-2 border-slate-200 text-sm font-bold rounded-xl text-slate-600 bg-white hover:border-indigo-200 hover:bg-slate-50 transition-all active:scale-95"
+              <button
+                onClick={handleAzureLogin}
+                className="w-full flex items-center justify-center px-6 py-4 border border-transparent text-md font-bold rounded-xl text-white bg-[#0078d4] hover:bg-[#106ebe] shadow-xl shadow-blue-600/20 transition-all active:scale-95"
+              >
+                <svg
+                  className="w-5 h-5 mr-3"
+                  viewBox="0 0 21 21"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  Tenant Administrator Access
-                </button>
+                  <rect width="10" height="10" fill="#f25022" />
+                  <rect x="11" width="10" height="10" fill="#7fba00" />
+                  <rect y="11" width="10" height="10" fill="#00a4ef" />
+                  <rect x="11" y="11" width="10" height="10" fill="#ffb900" />
+                </svg>
+                Sign in with Microsoft
+              </button>
+
+              <div className="mt-6 pt-6 border-t border-slate-100">
+                <p className="text-xs text-slate-400 text-center">
+                  Only users with authorized company email domains can access this application.
+                </p>
               </div>
-            )}
-            
-            <div className="mt-6 pt-6 border-t border-slate-50">
-              <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
-                <span className="flex items-center"><ShieldCheck className="w-3 h-3 mr-1 text-emerald-500" /> AES-256 Encrypted</span>
-                <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="hover:text-indigo-600 flex items-center transition-colors">
-                  Compliance Docs <ExternalLink className="w-2 h-2 ml-1" />
-                </a>
-              </div>
+            </div>
+          )}
+
+          <div className="mt-8 pt-6 border-t border-slate-50">
+            <div className="flex items-center justify-center text-[10px] text-slate-400 font-medium">
+              <ShieldCheck className="w-3 h-3 mr-1 text-emerald-500" />
+              Secured by Microsoft Entra ID + AWS Cognito
             </div>
           </div>
         </div>
-        
+
         <p className="mt-8 text-center text-xs text-slate-400 leading-relaxed px-12">
-          Strict tenant isolation is enforced via AWS IAM policies and DynamoDB Partition Keys. 
-          Cross-tenant data leakage is prevention-guaranteed at the API level.
+          Your organization's security policies apply. Contact your IT administrator if you have trouble signing in.
         </p>
       </div>
     </div>

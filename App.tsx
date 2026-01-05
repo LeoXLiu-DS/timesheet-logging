@@ -1,14 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { User, Role, TimeEntry, Status, Tenant } from './types';
-import { INITIAL_ENTRIES, MOCK_TASKS, MOCK_PROJECTS, MOCK_TENANTS, MOCK_USERS } from './constants';
+import { MOCK_TASKS, MOCK_PROJECTS, MOCK_TENANTS } from './constants';
 import Login from './components/Login';
 import WeeklyTimesheet from './components/WeeklyTimesheet';
 import ManagerTimesheetList from './components/ManagerTimesheetList';
 import ManagerExport from './components/ManagerExport';
 import TenantAdmin from './components/TenantAdmin';
 import { StorageService } from './services/storageService';
-import { getCurrentTenant } from './services/authService';
-import { LogOut, Calendar, CheckSquare, Download, Settings, Shield, LayoutDashboard, Loader2 } from 'lucide-react';
+import { getCurrentTenant, getAuthenticatedUser, signOutUser, setupAuthListener } from './services/authService';
+import { LogOut, Calendar, CheckSquare, Download, Settings, Loader2 } from 'lucide-react';
 
 type View = 'CONTRACTOR_HOME' | 'MANAGER_HOME' | 'MANAGER_DETAIL' | 'MANAGER_EXPORT' | 'TENANT_ADMIN';
 
@@ -17,24 +17,54 @@ const App: React.FC = () => {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [tenantUsers, setTenantUsers] = useState<User[]>([]);
   const [currentView, setCurrentView] = useState<View>('CONTRACTOR_HOME');
-  const [isLoading, setIsLoading] = useState(false);
-  
-  // Persistent Storage Initialization
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isDataLoading, setIsDataLoading] = useState(false);
+
+  // Check for existing authenticated session on mount
   useEffect(() => {
-    StorageService.initialize(INITIAL_ENTRIES, MOCK_USERS);
+    const checkAuth = async () => {
+      try {
+        const authenticatedUser = await getAuthenticatedUser();
+        if (authenticatedUser) {
+          setUser(authenticatedUser);
+          setCurrentView(authenticatedUser.role === Role.MANAGER ? 'MANAGER_HOME' : 'CONTRACTOR_HOME');
+        }
+      } catch (error) {
+        console.log('No authenticated session');
+      } finally {
+        setIsAuthLoading(false);
+      }
+    };
+    checkAuth();
+
+    // Set up auth listener for redirect callbacks
+    const unsubscribe = setupAuthListener(
+      (authenticatedUser) => {
+        setUser(authenticatedUser);
+        setCurrentView(authenticatedUser.role === Role.MANAGER ? 'MANAGER_HOME' : 'CONTRACTOR_HOME');
+        setIsAuthLoading(false);
+      },
+      () => {
+        setUser(null);
+        setEntries([]);
+        setCurrentView('CONTRACTOR_HOME');
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
 
   // Sync data when user or view changes
   useEffect(() => {
     if (user) {
-      setIsLoading(true);
+      setIsDataLoading(true);
       Promise.all([
         StorageService.getEntries(user.tenantId),
         StorageService.getUsers(user.tenantId)
       ]).then(([fetchedEntries, fetchedUsers]) => {
         setEntries(fetchedEntries);
         setTenantUsers(fetchedUsers);
-        setIsLoading(false);
+        setIsDataLoading(false);
       });
     }
   }, [user, currentView]);
@@ -51,13 +81,8 @@ const App: React.FC = () => {
     user ? MOCK_PROJECTS.filter(p => p.tenantId === user.tenantId) : []
   , [user]);
 
-  // Auth Handlers
-  const handleLogin = (loggedInUser: User) => {
-    setUser(loggedInUser);
-    setCurrentView(loggedInUser.role === Role.MANAGER ? 'MANAGER_HOME' : 'CONTRACTOR_HOME');
-  };
-
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOutUser();
     setUser(null);
     setEntries([]);
     setCurrentView('CONTRACTOR_HOME');
@@ -126,8 +151,17 @@ const App: React.FC = () => {
 
   const [managerContext, setManagerContext] = useState<{ contractorId: string, weekStart: Date } | null>(null);
 
+  // Show loading state while checking auth
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
+
   if (!user || !currentTenant) {
-    return <Login onLogin={handleLogin} />;
+    return <Login />;
   }
 
   return (
@@ -220,7 +254,7 @@ const App: React.FC = () => {
         </header>
 
         <main className="flex-1 overflow-hidden relative overflow-y-auto custom-scrollbar">
-          {isLoading ? (
+          {isDataLoading ? (
             <div className="flex h-full items-center justify-center">
               <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
             </div>
